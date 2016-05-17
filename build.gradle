@@ -1,0 +1,173 @@
+def vXnat = '1.7.0-SNAPSHOT'
+def vSpring = '4.2.5.RELEASE'
+def vSwagger = '2.3.1'
+def vJackson = '2.6.5'
+def vJunit = '4.12'
+def vH2 = '1.4.191'
+
+def vGroovy = '2.4.6'
+
+group 'org.nrg.xnat'
+version vXnat
+
+apply plugin: 'groovy'
+apply plugin: 'java'
+apply plugin: 'maven'
+apply plugin: 'maven-publish'
+apply plugin: 'idea'
+apply plugin: 'eclipse'
+
+repositories {
+    mavenLocal()
+    jcenter()
+    maven {
+        url 'https://nrgxnat.artifactoryonline.com/nrgxnat/libs-release'
+        name 'XNAT Release Repository'
+    }
+    maven {
+        url 'https://nrgxnat.artifactoryonline.com/nrgxnat/libs-snapshot'
+        name 'XNAT Snapshot Repository'
+    }
+    maven {
+        url 'https://nrgxnat.artifactoryonline.com/nrgxnat/ext-release'
+        name 'XNAT External Release Repository'
+    }
+    maven {
+        url 'http://www.dcm4che.org/maven2'
+        name 'dcm4che Maven Repository'
+    }
+    mavenCentral()
+}
+
+sourceCompatibility = 1.7
+targetCompatibility = 1.7
+
+if (hasProperty("rt.17.jar")) {
+    // Solution for bootstrap classpath warning and possible issues with compatibility with 1.7 libraries
+    // was taken from this post on discuss.gradle.org: http://bit.ly/24xD9j0
+    def rt17jar = getProperty("rt.17.jar")
+    logger.info "Using ${rt17jar} as the bootstrap class path jar."
+    gradle.projectsEvaluated {
+        tasks.withType(JavaCompile) {
+            options.fork = true
+            options.compilerArgs << "-XDignore.symbol.file"
+            options.bootClasspath = rt17jar
+        }
+    }
+} else {
+    logger.warn "No value was set for the rt.17.jar build property, using the default bootstrap class path. You should consider setting rt.17.jar to indicate a jar file containing the Java 1.7 run-time library:\n"
+    logger.warn "  ./gradlew -Prt.17.jar=rt-1.7.0_45.jar clean test\n"
+}
+
+task sourceJar(type: Jar, dependsOn: classes) {
+    from sourceSets.main.allSource
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    from javadoc.destinationDir
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+
+            artifact sourceJar {
+                classifier "sources"
+            }
+
+            artifact javadocJar {
+                classifier "javadoc"
+            }
+
+            pom.withXml {
+                def root = asNode()
+                root.appendNode('name', 'XNAT Imaging Utilities')
+                root.appendNode('description', '')
+                root.appendNode('url', 'https://bitbucket.org/xnatdev/images')
+                root.appendNode('inceptionYear', '2016')
+
+                def scm = root.appendNode('scm')
+                scm.appendNode('url', 'https://bitbucket.org/xnatdev/images')
+                scm.appendNode('connection', 'scm:https://bitbucket.org/xnatdev/images.git')
+                scm.appendNode('developerConnection', 'scm:git://bitbucket.org/xnatdev/images.git')
+
+                def license = root.appendNode('licenses').appendNode('license')
+                license.appendNode('name', 'Simplified BSD 2-Clause License')
+                license.appendNode('url', 'http://xnat.org/about/license.php')
+                license.appendNode('distribution', 'repo')
+
+                def developers = root.appendNode('developers')
+                def rherrick = developers.appendNode('developer')
+                rherrick.appendNode('id', 'rherrick')
+                rherrick.appendNode('name', 'Rick Herrick')
+                rherrick.appendNode('email', 'jrherrick@wustl.edu')
+            }
+        }
+    }
+    repositories {
+        maven {
+            credentials {
+                // These properties must be set in the ~/.gradle/gradle.properties file or passed on the Gradle command
+                // line in the form -PrepoUsername=foo -PrepoPassword=bar.
+                username propertyWithDefault('repoUsername', 'username')
+                password propertyWithDefault('repoPassword', 'password')
+            }
+            if (project.version.endsWith('-SNAPSHOT')) {
+                url "https://nrgxnat.artifactoryonline.com/nrgxnat/libs-snapshot-local"
+            } else {
+                url "https://nrgxnat.artifactoryonline.com/nrgxnat/libs-release-local"
+            }
+        }
+    }
+}
+
+def propertyWithDefault(def String property, def Object value) {
+    hasProperty(property) ? getProperty(property) : value
+}
+
+dependencies {
+    compile("org.nrg.xdat:core:${vXnat}") {
+        transitive = false
+    }
+    compile("org.nrg.xnat:xnat-data-models:${vXnat}") {
+        transitive = false
+    }
+
+    compile "org.nrg:framework:${vXnat}"
+    compile("org.nrg:prefs:${vXnat}") {
+        transitive = false
+    }
+
+    compile("org.nrg:pipelineXNAT:1.0") {
+        transitive = false
+    }
+
+    compile("org.nrg.xnat.pipeline:xnat_tools:${vXnat}") {
+        transitive = false
+    }
+
+    compile "org.nrg.xnat:xnatsrb:1.0.1"
+
+    compile "org.springframework.security:spring-security-core:4.1.0.RELEASE"
+
+    compile "javax.xml.rpc:javax.xml.rpc-api:1.1.1"
+    compile "javax.mail:javax.mail-api:1.5.5"
+    compile "org.dspace:jargon:1.4.25"
+    compile "com.jcraft:jzlib:1.1.3"
+    compile("stratum:stratum:1.0") {
+        transitive = false
+    }
+    compile "nifti_io:nifti_io:1.0"
+    compile "net.imagej:ij:1.50e"
+    compile "jakarta-regexp:jakarta-regexp:1.4"
+    compile "gnu.getopt:java-getopt:1.0.13"
+    compile "org.apache.xmlbeans:xmlbeans:2.6.0"
+    compile "javax.servlet:javax.servlet-api:3.1.0"
+    compile "commons-lang:commons-lang:2.6"
+    compile "org.apache.commons:commons-lang3:3.4"
+    compile "org.apache.ant:ant:1.9.7"
+    compile "log4j:log4j:1.2.17"
+
+    compile "org.codehaus.groovy:groovy-all:${vGroovy}"
+}
